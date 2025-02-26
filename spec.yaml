@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: GCS File Upload Service
+  version: 1.0.0
+  description: |
+    Secure API for uploading files to Google Cloud Storage with Basic Authentication.
+    Supports file validation and provides detailed upload metadata.
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.example.com
+    description: Production server
+paths:
+  /upload:
+    post:
+      tags:
+        - File Operations
+      summary: Upload a file to Google Cloud Storage
+      description: |
+        Uploads a file to GCS bucket with the following constraints:
+        - Maximum file size: 10MB
+        - Allowed content types: text/plain, application/pdf, image/*
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload
+                  x-content-type:
+                    - text/plain
+                    - application/pdf
+                    - image/*
+              encoding:
+                file:
+                  contentType: application/octet-stream
+      responses:
+        "200":
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              example: "*"
+        "400":
+          description: |
+            Bad Request. Possible reasons:
+            - Invalid file format
+            - File size exceeds limit
+            - Missing file in request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: |
+            Unauthorized. Valid reasons:
+            - Missing Authorization header
+            - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - basicAuth: []
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: |
+        Requires valid username/password combination.
+        Credentials must be base64 encoded in the Authorization header.
+  schemas:
+    UploadResponse:
+      type: object
+      properties:
+        filename:
+          type: string
+          example: "example.pdf"
+        size:
+          type: integer
+          format: int64
+          example: 1024
+        gcs_path:
+          type: string
+          format: uri
+          example: "gs://my-bucket/example.pdf"
+        uploaded_at:
+          type: string
+          format: date-time
+          example: "2023-08-20T12:34:56Z"
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "authentication_required"
+        error_description:
+          type: string
+          example: "Missing Authorization header"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2023-08-20T12:34:56Z"
+      required:
+        - error
+        - timestamp
+
+x-security:
+  - basicAuth:
+      type: user
+      description: Requires valid username/password credentials
