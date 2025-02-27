@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"strings"
 	"time"
@@ -13,78 +14,136 @@ import (
 	"gitlab.com/totalprocessing/file-upload/internal/fileupload"
 )
 
+// Configuration constants (move to config package or environment variables)
 const (
 	bucketName    = "dwh-test-upload-file"
-	maxUploadSize = 10 * 1024 * 1024
-	allowedTypes  = "text/plain,application/pdf,image/"
+	maxUploadSize = 10 * 1024 * 1024 // 10MB
 )
 
+// Allowed MIME types for file uploads
+var allowedTypes = map[string]bool{
+	"text/csv":        true,
+	"application/csv": true,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+}
+
 type GcsClient struct {
+	Logger    *slog.Logger
 	GcsClient *storage.Client
 }
 
-// New storage gcs client
+// NewGcsClient creates a new GCS client
 func NewGcsClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return &storage.Client{}, err
+		return nil, fmt.Errorf("failed to create GCS client: %w", err)
 	}
 	return client, nil
 }
 
-// Actually uploads the file to GCS
-func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, contentType string, file http.MultipartFile) (*fileupload.UploadResponse, error) {
+// UploadToGcs handles file uploads to Google Cloud Storage
+func (g *GcsClient) UploadToGcs(
+	ctx context.Context,
+	filename string,
+	contentType string,
+	file http.MultipartFile,
+) (*fileupload.UploadResponse, error) {
 
+	// Validate and sanitize input
 	filename = sanitizeFilename(filename)
-
-	if file.Size > maxUploadSize {
-		return nil, fmt.Errorf("file size exceeds 10MB limit")
+	if err := validateFile(file, contentType); err != nil {
+		g.Logger.Error("file failed validation", "error", err)
+		return nil, err
 	}
 
-	// 2. Validate content type
-	if !isAllowedType(contentType) {
-		return nil, fmt.Errorf("invalid file type: %s", contentType)
-	}
-	bucket := g.GcsClient.Bucket(bucketName)
-	obj := bucket.Object(filename)
+	// Create GCS object writer
+	obj := g.GcsClient.Bucket(bucketName).Object(filename)
 	w := obj.NewWriter(ctx)
 	defer w.Close()
 
-	size, err := io.Copy(w, file.File)
+	// Set content type metadata
+	w.ObjectAttrs.ContentType = contentType
+
+	// Upload file with retry logic
+	size, err := uploadWithRetry(w, file.File)
 	if err != nil {
-		return nil, fmt.Errorf("gcs upload failed: %w", err)
+		return nil, fmt.Errorf("gcs upload failed for %s: %w", filename, err)
 	}
 
-	// const maxRetries = 3
-	// var backoff = []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
-
-	// for i := 0; ; i++ {
-	// 	_, err = io.Copy(w, file)
-	// 	if err == nil {
-	// 		break
-	// 	}
-	// 	if i >= maxRetries {
-	// 		return nil, fmt.Errorf("upload failed after %d retries: %w", maxRetries, err)
-	// 	}
-	// 	time.Sleep(backoff[i])
-	// }
-
 	return &fileupload.UploadResponse{
-		Filename: fileupload.OptString{Value: filename},
-		// GcsPath:    fileupload.OptURI{Value: obj.ObjectName()},
-		Size:       fileupload.OptInt64{Value: size},
-		UploadedAt: fileupload.OptDateTime{Value: time.Now().UTC()},
+		Filename:   filename,
+		Gcspath:    fileupload.NewOptString(fmt.Sprintf("gs://%s/%s", bucketName, filename)),
+		FileSize:   size,
+		UploadTime: time.Now().UTC(),
 	}, nil
 }
 
-// Helper functions
-func isAllowedType(contentType string) bool {
-	baseType := strings.Split(mime.FormatMediaType(contentType, nil), ";")[0]
-	return strings.HasPrefix(baseType, allowedTypes) ||
-		baseType == "application/pdf" ||
-		baseType == "text/plain"
+// validateFile checks file size and type
+func validateFile(file http.MultipartFile, contentType string) error {
+	contentType = strings.TrimPrefix(contentType, "type=")
+	if file.Size > maxUploadSize {
+		return fmt.Errorf("file size exceeds 10MB limit: %d bytes", file.Size)
+	}
+
+	if !isAllowedType(contentType) {
+		return fmt.Errorf("invalid file type: %s. allowed types: %v", contentType, allowedTypes)
+	}
+
+	return nil
 }
 
+// isAllowedType checks if the content type is permitted
+func isAllowedType(contentType string) bool {
+	baseType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return allowedTypes[baseType] // Lookup should work now
+}
+
+// uploadWithRetry implements retry logic for GCS uploads
+func uploadWithRetry(w io.Writer, file io.Reader) (int64, error) {
+	const maxRetries = 3
+	var backoff = []time.Duration{
+		100 * time.Millisecond,
+		500 * time.Millisecond,
+		1 * time.Second,
+	}
+
+	var size int64
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		size, err = io.Copy(w, file)
+		if err == nil {
+			return size, nil
+		}
+
+		if attempt < maxRetries {
+			time.Sleep(backoff[attempt])
+		}
+	}
+
+	return 0, fmt.Errorf("upload failed after %d retries: %w", maxRetries, err)
+}
+
+// sanitizeFilename ensures safe filenames
 func sanitizeFilename(name string) string {
-	return strings.ReplaceAll(name, "..", "") // Basic sanitation
+	// Remove path traversal attempts
+	name = strings.ReplaceAll(name, "..", "")
+
+	// Remove special characters
+	name = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-', r == '_', r == '.':
+		default:
+			return '_'
+		}
+		return r
+	}, name)
+
+	return strings.TrimSpace(name)
 }

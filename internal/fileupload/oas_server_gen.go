@@ -10,12 +10,18 @@ import (
 type Handler interface {
 	// UploadFile implements uploadFile operation.
 	//
-	// Uploads a file to GCS bucket with the following constraints:
+	// Uploads a spreadsheet file to GCS bucket with the following constraints:
 	// - Maximum file size: 10MB
-	// - Allowed content types: text/plain, application/pdf, image/*.
+	// - Allowed content types:
+	// - CSV (text/csv, application/csv)
+	// - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 	//
 	// POST /upload
 	UploadFile(ctx context.Context, req *UploadFileReq) (UploadFileRes, error)
+	// NewError creates *ErrorStatusCodeWithHeaders from error returned by handler.
+	//
+	// Used for common default response.
+	NewError(ctx context.Context, err error) *ErrorStatusCodeWithHeaders
 }
 
 // Server implements http server based on OpenAPI v3 specification and

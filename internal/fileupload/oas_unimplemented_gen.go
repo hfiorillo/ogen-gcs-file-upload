@@ -15,11 +15,21 @@ var _ Handler = UnimplementedHandler{}
 
 // UploadFile implements uploadFile operation.
 //
-// Uploads a file to GCS bucket with the following constraints:
+// Uploads a spreadsheet file to GCS bucket with the following constraints:
 // - Maximum file size: 10MB
-// - Allowed content types: text/plain, application/pdf, image/*.
+// - Allowed content types:
+// - CSV (text/csv, application/csv)
+// - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 //
 // POST /upload
 func (UnimplementedHandler) UploadFile(ctx context.Context, req *UploadFileReq) (r UploadFileRes, _ error) {
 	return r, ht.ErrNotImplemented
+}
+
+// NewError creates *ErrorStatusCodeWithHeaders from error returned by handler.
+//
+// Used for common default response.
+func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorStatusCodeWithHeaders) {
+	r = new(ErrorStatusCodeWithHeaders)
+	return r
 }

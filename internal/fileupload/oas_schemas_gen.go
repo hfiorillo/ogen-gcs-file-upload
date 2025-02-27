@@ -3,11 +3,15 @@
 package fileupload
 
 import (
-	"net/url"
+	"fmt"
 	"time"
 
 	ht "github.com/ogen-go/ogen/http"
 )
+
+func (s *ErrorStatusCodeWithHeaders) Error() string {
+	return fmt.Sprintf("code %d: %+v", s.StatusCode, s.Response)
+}
 
 type BasicAuth struct {
 	Username string
@@ -36,131 +40,79 @@ func (s *BasicAuth) SetPassword(val string) {
 
 // Ref: #/components/schemas/Error
 type Error struct {
-	Error            string    `json:"error"`
-	ErrorDescription OptString `json:"error_description"`
-	Timestamp        time.Time `json:"timestamp"`
+	// HTTP status code.
+	Code int32 `json:"code"`
+	// Error message.
+	Message string `json:"message"`
+	// Additional error details if available.
+	Details []string `json:"details"`
 }
 
-// GetError returns the value of Error.
-func (s *Error) GetError() string {
-	return s.Error
+// GetCode returns the value of Code.
+func (s *Error) GetCode() int32 {
+	return s.Code
 }
 
-// GetErrorDescription returns the value of ErrorDescription.
-func (s *Error) GetErrorDescription() OptString {
-	return s.ErrorDescription
+// GetMessage returns the value of Message.
+func (s *Error) GetMessage() string {
+	return s.Message
 }
 
-// GetTimestamp returns the value of Timestamp.
-func (s *Error) GetTimestamp() time.Time {
-	return s.Timestamp
+// GetDetails returns the value of Details.
+func (s *Error) GetDetails() []string {
+	return s.Details
 }
 
-// SetError sets the value of Error.
-func (s *Error) SetError(val string) {
-	s.Error = val
+// SetCode sets the value of Code.
+func (s *Error) SetCode(val int32) {
+	s.Code = val
 }
 
-// SetErrorDescription sets the value of ErrorDescription.
-func (s *Error) SetErrorDescription(val OptString) {
-	s.ErrorDescription = val
+// SetMessage sets the value of Message.
+func (s *Error) SetMessage(val string) {
+	s.Message = val
 }
 
-// SetTimestamp sets the value of Timestamp.
-func (s *Error) SetTimestamp(val time.Time) {
-	s.Timestamp = val
+// SetDetails sets the value of Details.
+func (s *Error) SetDetails(val []string) {
+	s.Details = val
 }
 
-// NewOptDateTime returns new OptDateTime with value set to v.
-func NewOptDateTime(v time.Time) OptDateTime {
-	return OptDateTime{
-		Value: v,
-		Set:   true,
-	}
+// ErrorStatusCodeWithHeaders wraps Error with status code and response headers.
+type ErrorStatusCodeWithHeaders struct {
+	StatusCode               int
+	AccessControlAllowOrigin OptString
+	Response                 Error
 }
 
-// OptDateTime is optional time.Time.
-type OptDateTime struct {
-	Value time.Time
-	Set   bool
+// GetStatusCode returns the value of StatusCode.
+func (s *ErrorStatusCodeWithHeaders) GetStatusCode() int {
+	return s.StatusCode
 }
 
-// IsSet returns true if OptDateTime was set.
-func (o OptDateTime) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptDateTime) Reset() {
-	var v time.Time
-	o.Value = v
-	o.Set = false
+// GetAccessControlAllowOrigin returns the value of AccessControlAllowOrigin.
+func (s *ErrorStatusCodeWithHeaders) GetAccessControlAllowOrigin() OptString {
+	return s.AccessControlAllowOrigin
 }
 
-// SetTo sets value to v.
-func (o *OptDateTime) SetTo(v time.Time) {
-	o.Set = true
-	o.Value = v
+// GetResponse returns the value of Response.
+func (s *ErrorStatusCodeWithHeaders) GetResponse() Error {
+	return s.Response
 }
 
-// Get returns value and boolean that denotes whether value was set.
-func (o OptDateTime) Get() (v time.Time, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
+// SetStatusCode sets the value of StatusCode.
+func (s *ErrorStatusCodeWithHeaders) SetStatusCode(val int) {
+	s.StatusCode = val
 }
 
-// Or returns value if set, or given parameter if does not.
-func (o OptDateTime) Or(d time.Time) time.Time {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
+// SetAccessControlAllowOrigin sets the value of AccessControlAllowOrigin.
+func (s *ErrorStatusCodeWithHeaders) SetAccessControlAllowOrigin(val OptString) {
+	s.AccessControlAllowOrigin = val
 }
 
-// NewOptInt64 returns new OptInt64 with value set to v.
-func NewOptInt64(v int64) OptInt64 {
-	return OptInt64{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInt64 is optional int64.
-type OptInt64 struct {
-	Value int64
-	Set   bool
-}
-
-// IsSet returns true if OptInt64 was set.
-func (o OptInt64) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInt64) Reset() {
-	var v int64
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInt64) SetTo(v int64) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInt64) Get() (v int64, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInt64) Or(d int64) int64 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
+// SetResponse sets the value of Response.
+func (s *ErrorStatusCodeWithHeaders) SetResponse(val Error) {
+	s.Response = val
 }
 
 // NewOptString returns new OptString with value set to v.
@@ -209,52 +161,6 @@ func (o OptString) Or(d string) string {
 	return d
 }
 
-// NewOptURI returns new OptURI with value set to v.
-func NewOptURI(v url.URL) OptURI {
-	return OptURI{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptURI is optional url.URL.
-type OptURI struct {
-	Value url.URL
-	Set   bool
-}
-
-// IsSet returns true if OptURI was set.
-func (o OptURI) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptURI) Reset() {
-	var v url.URL
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptURI) SetTo(v url.URL) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptURI) Get() (v url.URL, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptURI) Or(d url.URL) url.URL {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 type UploadFileBadRequest Error
 
 func (*UploadFileBadRequest) uploadFileRes() {}
@@ -264,7 +170,7 @@ type UploadFileInternalServerError Error
 func (*UploadFileInternalServerError) uploadFileRes() {}
 
 type UploadFileReq struct {
-	// File to upload.
+	// Spreadsheet file to upload (CSV or XLSX).
 	File ht.MultipartFile `json:"file"`
 }
 
@@ -284,50 +190,66 @@ func (*UploadFileUnauthorized) uploadFileRes() {}
 
 // Ref: #/components/schemas/UploadResponse
 type UploadResponse struct {
-	Filename   OptString   `json:"filename"`
-	Size       OptInt64    `json:"size"`
-	GcsPath    OptURI      `json:"gcs_path"`
-	UploadedAt OptDateTime `json:"uploaded_at"`
+	// Name of the uploaded file.
+	Filename string `json:"filename"`
+	// Size of the uploaded file in bytes.
+	FileSize int64 `json:"fileSize"`
+	// GCS bucket where the file was stored.
+	Bucket string `json:"bucket"`
+	// GCS Path.
+	Gcspath OptString `json:"gcspath"`
+	// Timestamp when the file was uploaded.
+	UploadTime time.Time `json:"uploadTime"`
 }
 
 // GetFilename returns the value of Filename.
-func (s *UploadResponse) GetFilename() OptString {
+func (s *UploadResponse) GetFilename() string {
 	return s.Filename
 }
 
-// GetSize returns the value of Size.
-func (s *UploadResponse) GetSize() OptInt64 {
-	return s.Size
+// GetFileSize returns the value of FileSize.
+func (s *UploadResponse) GetFileSize() int64 {
+	return s.FileSize
 }
 
-// GetGcsPath returns the value of GcsPath.
-func (s *UploadResponse) GetGcsPath() OptURI {
-	return s.GcsPath
+// GetBucket returns the value of Bucket.
+func (s *UploadResponse) GetBucket() string {
+	return s.Bucket
 }
 
-// GetUploadedAt returns the value of UploadedAt.
-func (s *UploadResponse) GetUploadedAt() OptDateTime {
-	return s.UploadedAt
+// GetGcspath returns the value of Gcspath.
+func (s *UploadResponse) GetGcspath() OptString {
+	return s.Gcspath
+}
+
+// GetUploadTime returns the value of UploadTime.
+func (s *UploadResponse) GetUploadTime() time.Time {
+	return s.UploadTime
 }
 
 // SetFilename sets the value of Filename.
-func (s *UploadResponse) SetFilename(val OptString) {
+func (s *UploadResponse) SetFilename(val string) {
 	s.Filename = val
 }
 
-// SetSize sets the value of Size.
-func (s *UploadResponse) SetSize(val OptInt64) {
-	s.Size = val
+// SetFileSize sets the value of FileSize.
+func (s *UploadResponse) SetFileSize(val int64) {
+	s.FileSize = val
 }
 
-// SetGcsPath sets the value of GcsPath.
-func (s *UploadResponse) SetGcsPath(val OptURI) {
-	s.GcsPath = val
+// SetBucket sets the value of Bucket.
+func (s *UploadResponse) SetBucket(val string) {
+	s.Bucket = val
 }
 
-// SetUploadedAt sets the value of UploadedAt.
-func (s *UploadResponse) SetUploadedAt(val OptDateTime) {
-	s.UploadedAt = val
+// SetGcspath sets the value of Gcspath.
+func (s *UploadResponse) SetGcspath(val OptString) {
+	s.Gcspath = val
+}
+
+// SetUploadTime sets the value of UploadTime.
+func (s *UploadResponse) SetUploadTime(val time.Time) {
+	s.UploadTime = val
 }
 
 // UploadResponseHeaders wraps UploadResponse with response headers.

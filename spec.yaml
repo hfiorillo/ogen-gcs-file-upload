@@ -3,8 +3,8 @@ info:
   title: GCS File Upload Service
   version: 1.0.0
   description: |
-    Secure API for uploading files to Google Cloud Storage with Basic Authentication.
-    Supports file validation and provides detailed upload metadata.
+    Secure API for uploading spreadsheet files to Google Cloud Storage with Basic Authentication.
+    Supports CSV and XLSX file formats with validation.
   contact:
     name: API Support
     email: support@example.com
@@ -21,11 +21,13 @@ paths:
     post:
       tags:
         - File Operations
-      summary: Upload a file to Google Cloud Storage
+      summary: Upload a spreadsheet file to Google Cloud Storage
       description: |
-        Uploads a file to GCS bucket with the following constraints:
+        Uploads a spreadsheet file to GCS bucket with the following constraints:
         - Maximum file size: 10MB
-        - Allowed content types: text/plain, application/pdf, image/*
+        - Allowed content types: 
+          - CSV (text/csv, application/csv)
+          - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
       operationId: uploadFile
       requestBody:
         required: true
@@ -39,14 +41,11 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: File to upload
+                  description: Spreadsheet file to upload (CSV or XLSX)
                   x-content-type:
-                    - text/plain
-                    - application/pdf
-                    - image/*
-              encoding:
-                file:
-                  contentType: application/octet-stream
+                    - text/csv
+                    - application/csv
+                    - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       responses:
         "200":
           description: File uploaded successfully
@@ -62,8 +61,8 @@ paths:
         "400":
           description: |
             Bad Request. Possible reasons:
-            - Invalid file format
-            - File size exceeds limit
+            - Invalid file format (not CSV/XLSX)
+            - File size exceeds 10MB limit
             - Missing file in request
           content:
             application/json:
@@ -84,6 +83,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: |
+            Unexpected error response. Covers all status codes not explicitly defined.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              example: "*"
       security:
         - basicAuth: []
 components:
@@ -100,37 +111,43 @@ components:
       properties:
         filename:
           type: string
-          example: "example.pdf"
-        size:
+          description: Name of the uploaded file
+        fileSize:
           type: integer
           format: int64
-          example: 1024
-        gcs_path:
+          description: Size of the uploaded file in bytes
+        bucket:
           type: string
-          format: uri
-          example: "gs://my-bucket/example.pdf"
-        uploaded_at:
+          description: GCS bucket where the file was stored
+        gcspath:
+          type: string
+          format: string
+          description: GCS Path
+        uploadTime:
           type: string
           format: date-time
-          example: "2023-08-20T12:34:56Z"
+          description: Timestamp when the file was uploaded
+      required:
+        - filename
+        - fileSize
+        - bucket
+        - gcs
+        - uploadTime
     Error:
       type: object
       properties:
-        error:
+        code:
+          type: integer
+          format: int32
+          description: HTTP status code
+        message:
           type: string
-          example: "authentication_required"
-        error_description:
-          type: string
-          example: "Missing Authorization header"
-        timestamp:
-          type: string
-          format: date-time
-          example: "2023-08-20T12:34:56Z"
+          description: Error message
+        details:
+          type: array
+          items:
+            type: string
+          description: Additional error details if available
       required:
-        - error
-        - timestamp
-
-x-security:
-  - basicAuth:
-      type: user
-      description: Requires valid username/password credentials
+        - code
+        - message

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -48,8 +47,7 @@ func (h *SecurityHandler) HandleBasicAuth(ctx context.Context, operationName fil
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(auth.Password)); err != nil {
-		fmt.Println(err)
-		return nil, errors.New("error credentials invalid")
+		return ctx, errors.New("error credentials invalid")
 	}
 
 	h.logger.Info("authenticated succesfully",

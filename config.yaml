@@ -8,6 +8,7 @@ parser:
   depth_limit: 1000
 # sets generator options.
 generator:
+  convenient_errors: "auto"
   # sets generator features.
   features:
     enable:

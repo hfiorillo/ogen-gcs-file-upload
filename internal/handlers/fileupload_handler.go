@@ -23,6 +23,7 @@ type UploadHandler struct {
 // This allows us to mock the client for testing
 type FileUploadClient interface {
 	UploadFile(ctx context.Context, req *fileupload.UploadFileReq) (fileupload.UploadFileRes, error)
+	NewError(ctx context.Context, err error) *fileupload.ErrorStatusCodeWithHeaders
 }
 
 // NewUploadHandler creates a new upload handler
@@ -34,9 +35,8 @@ func NewUploadHandler(logger *slog.Logger, filename string, gcsClient gcs.GcsCli
 	}
 }
 
-// UploadFile handles file upload requests\
+// UploadFile handles file upload requests
 // TODO: bug when multiple files are uploaded
-// TODO: check file type
 func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFileReq) (fileupload.UploadFileRes, error) {
 
 	startTime := time.Now()
@@ -46,20 +46,25 @@ func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFi
 		switch {
 		case strings.Contains(err.Error(), "invalid file type"),
 			strings.Contains(err.Error(), "file size exceeds"):
-			return &fileupload.UploadFileBadRequest{Error: err.Error()}, nil
+			return &fileupload.UploadFileBadRequest{}, err
 		default:
-			return &fileupload.UploadFileInternalServerError{Error: err.Error()}, nil
+			return &fileupload.UploadFileInternalServerError{}, err
 		}
 	}
 
 	h.logger.Info("file uploaded successfully",
-		"filename", req.File.Name,
-		"size", req.File.Size,
-		// "gcs filepath", req.GcsPath.Value,
+		"filename", response.Filename,
+		"size", response.FileSize,
+		"gcsPath", response.Gcspath.Value,
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return &fileupload.UploadResponseHeaders{
 		Response: *response,
 	}, nil
+}
+
+// TODO: whats this for?
+func (h *UploadHandler) NewError(ctx context.Context, err error) *fileupload.ErrorStatusCodeWithHeaders {
+	return &fileupload.ErrorStatusCodeWithHeaders{}
 }

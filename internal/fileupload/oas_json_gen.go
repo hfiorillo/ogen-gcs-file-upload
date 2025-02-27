@@ -5,7 +5,6 @@ package fileupload
 import (
 	"math/bits"
 	"strconv"
-	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
@@ -24,25 +23,29 @@ func (s *Error) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *Error) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("error")
-		e.Str(s.Error)
+		e.FieldStart("code")
+		e.Int32(s.Code)
 	}
 	{
-		if s.ErrorDescription.Set {
-			e.FieldStart("error_description")
-			s.ErrorDescription.Encode(e)
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details != nil {
+			e.FieldStart("details")
+			e.ArrStart()
+			for _, elem := range s.Details {
+				e.Str(elem)
+			}
+			e.ArrEnd()
 		}
-	}
-	{
-		e.FieldStart("timestamp")
-		json.EncodeDateTime(e, s.Timestamp)
 	}
 }
 
 var jsonFieldsNameOfError = [3]string{
-	0: "error",
-	1: "error_description",
-	2: "timestamp",
+	0: "code",
+	1: "message",
+	2: "details",
 }
 
 // Decode decodes Error from json.
@@ -54,39 +57,48 @@ func (s *Error) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "error":
+		case "code":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
+				v, err := d.Int32()
+				s.Code = int32(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
 				v, err := d.Str()
-				s.Error = string(v)
+				s.Message = string(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"error\"")
+				return errors.Wrap(err, "decode field \"message\"")
 			}
-		case "error_description":
+		case "details":
 			if err := func() error {
-				s.ErrorDescription.Reset()
-				if err := s.ErrorDescription.Decode(d); err != nil {
+				s.Details = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.Details = append(s.Details, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"error_description\"")
-			}
-		case "timestamp":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.Timestamp = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"timestamp\"")
+				return errors.Wrap(err, "decode field \"details\"")
 			}
 		default:
 			return d.Skip()
@@ -98,7 +110,7 @@ func (s *Error) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000101,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -144,76 +156,6 @@ func (s *Error) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes time.Time as json.
-func (o OptDateTime) Encode(e *jx.Encoder, format func(*jx.Encoder, time.Time)) {
-	if !o.Set {
-		return
-	}
-	format(e, o.Value)
-}
-
-// Decode decodes time.Time from json.
-func (o *OptDateTime) Decode(d *jx.Decoder, format func(*jx.Decoder) (time.Time, error)) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptDateTime to nil")
-	}
-	o.Set = true
-	v, err := format(d)
-	if err != nil {
-		return err
-	}
-	o.Value = v
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptDateTime) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e, json.EncodeDateTime)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptDateTime) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d, json.DecodeDateTime)
-}
-
-// Encode encodes int64 as json.
-func (o OptInt64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Int64(int64(o.Value))
-}
-
-// Decode decodes int64 from json.
-func (o *OptInt64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInt64 to nil")
-	}
-	o.Set = true
-	v, err := d.Int64()
-	if err != nil {
-		return err
-	}
-	o.Value = int64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInt64) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInt64) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes string as json.
 func (o OptString) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -245,41 +187,6 @@ func (s OptString) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptString) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes url.URL as json.
-func (o OptURI) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	json.EncodeURI(e, o.Value)
-}
-
-// Decode decodes url.URL from json.
-func (o *OptURI) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptURI to nil")
-	}
-	o.Set = true
-	v, err := json.DecodeURI(d)
-	if err != nil {
-		return err
-	}
-	o.Value = v
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptURI) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptURI) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -408,36 +315,35 @@ func (s *UploadResponse) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UploadResponse) encodeFields(e *jx.Encoder) {
 	{
-		if s.Filename.Set {
-			e.FieldStart("filename")
-			s.Filename.Encode(e)
+		e.FieldStart("filename")
+		e.Str(s.Filename)
+	}
+	{
+		e.FieldStart("fileSize")
+		e.Int64(s.FileSize)
+	}
+	{
+		e.FieldStart("bucket")
+		e.Str(s.Bucket)
+	}
+	{
+		if s.Gcspath.Set {
+			e.FieldStart("gcspath")
+			s.Gcspath.Encode(e)
 		}
 	}
 	{
-		if s.Size.Set {
-			e.FieldStart("size")
-			s.Size.Encode(e)
-		}
-	}
-	{
-		if s.GcsPath.Set {
-			e.FieldStart("gcs_path")
-			s.GcsPath.Encode(e)
-		}
-	}
-	{
-		if s.UploadedAt.Set {
-			e.FieldStart("uploaded_at")
-			s.UploadedAt.Encode(e, json.EncodeDateTime)
-		}
+		e.FieldStart("uploadTime")
+		json.EncodeDateTime(e, s.UploadTime)
 	}
 }
 
-var jsonFieldsNameOfUploadResponse = [4]string{
+var jsonFieldsNameOfUploadResponse = [5]string{
 	0: "filename",
-	1: "size",
-	2: "gcs_path",
-	3: "uploaded_at",
+	1: "fileSize",
+	2: "bucket",
+	3: "gcspath",
+	4: "uploadTime",
 }
 
 // Decode decodes UploadResponse from json.
@@ -445,48 +351,67 @@ func (s *UploadResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode UploadResponse to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "filename":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Filename.Reset()
-				if err := s.Filename.Decode(d); err != nil {
+				v, err := d.Str()
+				s.Filename = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"filename\"")
 			}
-		case "size":
+		case "fileSize":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Size.Reset()
-				if err := s.Size.Decode(d); err != nil {
+				v, err := d.Int64()
+				s.FileSize = int64(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"size\"")
+				return errors.Wrap(err, "decode field \"fileSize\"")
 			}
-		case "gcs_path":
+		case "bucket":
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				s.GcsPath.Reset()
-				if err := s.GcsPath.Decode(d); err != nil {
+				v, err := d.Str()
+				s.Bucket = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"gcs_path\"")
+				return errors.Wrap(err, "decode field \"bucket\"")
 			}
-		case "uploaded_at":
+		case "gcspath":
 			if err := func() error {
-				s.UploadedAt.Reset()
-				if err := s.UploadedAt.Decode(d, json.DecodeDateTime); err != nil {
+				s.Gcspath.Reset()
+				if err := s.Gcspath.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"uploaded_at\"")
+				return errors.Wrap(err, "decode field \"gcspath\"")
+			}
+		case "uploadTime":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.UploadTime = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"uploadTime\"")
 			}
 		default:
 			return d.Skip()
@@ -494,6 +419,38 @@ func (s *UploadResponse) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode UploadResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00010111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUploadResponse) {
+					name = jsonFieldsNameOfUploadResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil

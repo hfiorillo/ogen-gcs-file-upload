@@ -162,7 +162,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 				switch method {
 				case "POST":
 					r.name = UploadFileOperation
-					r.summary = "Upload a file to Google Cloud Storage"
+					r.summary = "Upload a spreadsheet file to Google Cloud Storage"
 					r.operationID = "uploadFile"
 					r.pathPattern = "/upload"
 					r.args = args

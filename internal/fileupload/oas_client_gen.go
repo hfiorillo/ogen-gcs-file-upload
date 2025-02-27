@@ -30,9 +30,11 @@ func trimTrailingSlashes(u *url.URL) {
 type Invoker interface {
 	// UploadFile invokes uploadFile operation.
 	//
-	// Uploads a file to GCS bucket with the following constraints:
+	// Uploads a spreadsheet file to GCS bucket with the following constraints:
 	// - Maximum file size: 10MB
-	// - Allowed content types: text/plain, application/pdf, image/*.
+	// - Allowed content types:
+	// - CSV (text/csv, application/csv)
+	// - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 	//
 	// POST /upload
 	UploadFile(ctx context.Context, request *UploadFileReq) (UploadFileRes, error)
@@ -44,8 +46,12 @@ type Client struct {
 	sec       SecuritySource
 	baseClient
 }
+type errorHandler interface {
+	NewError(ctx context.Context, err error) *ErrorStatusCodeWithHeaders
+}
 
 var _ Handler = struct {
+	errorHandler
 	*Client
 }{}
 
@@ -85,9 +91,11 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 
 // UploadFile invokes uploadFile operation.
 //
-// Uploads a file to GCS bucket with the following constraints:
+// Uploads a spreadsheet file to GCS bucket with the following constraints:
 // - Maximum file size: 10MB
-// - Allowed content types: text/plain, application/pdf, image/*.
+// - Allowed content types:
+// - CSV (text/csv, application/csv)
+// - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 //
 // POST /upload
 func (c *Client) UploadFile(ctx context.Context, request *UploadFileReq) (UploadFileRes, error) {

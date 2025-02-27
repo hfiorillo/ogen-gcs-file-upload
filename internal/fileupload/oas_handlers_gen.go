@@ -32,9 +32,11 @@ func (c *codeRecorder) WriteHeader(status int) {
 
 // handleUploadFileRequest handles uploadFile operation.
 //
-// Uploads a file to GCS bucket with the following constraints:
+// Uploads a spreadsheet file to GCS bucket with the following constraints:
 // - Maximum file size: 10MB
-// - Allowed content types: text/plain, application/pdf, image/*.
+// - Allowed content types:
+// - CSV (text/csv, application/csv)
+// - XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 //
 // POST /upload
 func (s *Server) handleUploadFileRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -117,8 +119,9 @@ func (s *Server) handleUploadFileRequest(args [0]string, argsEscaped bool, w htt
 					Security:         "BasicAuth",
 					Err:              err,
 				}
-				defer recordError("Security:BasicAuth", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
+				if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
+					defer recordError("Security:BasicAuth", err)
+				}
 				return
 			}
 			if ok {
@@ -145,8 +148,9 @@ func (s *Server) handleUploadFileRequest(args [0]string, argsEscaped bool, w htt
 				OperationContext: opErrContext,
 				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
 			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
+			if encodeErr := encodeErrorResponse(s.h.NewError(ctx, err), w, span); encodeErr != nil {
+				defer recordError("Security", err)
+			}
 			return
 		}
 	}
@@ -171,7 +175,7 @@ func (s *Server) handleUploadFileRequest(args [0]string, argsEscaped bool, w htt
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    UploadFileOperation,
-			OperationSummary: "Upload a file to Google Cloud Storage",
+			OperationSummary: "Upload a spreadsheet file to Google Cloud Storage",
 			OperationID:      "uploadFile",
 			Body:             request,
 			Params:           middleware.Parameters{},
@@ -200,8 +204,19 @@ func (s *Server) handleUploadFileRequest(args [0]string, argsEscaped bool, w htt
 		response, err = s.h.UploadFile(ctx, request)
 	}
 	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
+		if errRes, ok := errors.Into[*ErrorStatusCodeWithHeaders](err); ok {
+			if err := encodeErrorResponse(errRes, w, span); err != nil {
+				defer recordError("Internal", err)
+			}
+			return
+		}
+		if errors.Is(err, ht.ErrNotImplemented) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+		if err := encodeErrorResponse(s.h.NewError(ctx, err), w, span); err != nil {
+			defer recordError("Internal", err)
+		}
 		return
 	}
 
