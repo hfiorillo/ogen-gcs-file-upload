@@ -14,11 +14,16 @@ import (
 	"gitlab.com/totalprocessing/file-upload/internal/fileupload"
 )
 
-// Configuration constants (move to config package or environment variables)
+// TODO: move to env vars
 const (
-	bucketName    = "dwh-test-upload-file"
 	maxUploadSize = 10 * 1024 * 1024 // 10MB
 )
+
+type GcsConfig struct {
+	GcsProject    string
+	GcsLocation   string
+	GcsBucketName string
+}
 
 // Allowed MIME types for file uploads
 var allowedTypes = map[string]bool{
@@ -28,6 +33,7 @@ var allowedTypes = map[string]bool{
 }
 
 type GcsClient struct {
+	GcsConfig GcsConfig
 	Logger    *slog.Logger
 	GcsClient *storage.Client
 }
@@ -57,7 +63,7 @@ func (g *GcsClient) UploadToGcs(
 	}
 
 	// Create GCS object writer
-	obj := g.GcsClient.Bucket(bucketName).Object(filename)
+	obj := g.GcsClient.Bucket(g.GcsConfig.GcsBucketName).Object(filename)
 	w := obj.NewWriter(ctx)
 	defer w.Close()
 
@@ -72,7 +78,7 @@ func (g *GcsClient) UploadToGcs(
 
 	return &fileupload.UploadResponse{
 		Filename:   filename,
-		Gcspath:    fileupload.NewOptString(fmt.Sprintf("gs://%s/%s", bucketName, filename)),
+		Gcspath:    fileupload.NewOptString(fmt.Sprintf("gs://%s/%s", g.GcsConfig.GcsBucketName, filename)),
 		FileSize:   size,
 		UploadTime: time.Now().UTC(),
 	}, nil

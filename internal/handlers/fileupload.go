@@ -16,7 +16,6 @@ var _ fileupload.Handler = (*UploadHandler)(nil)
 // UploadHandler implements the generated Handler interface for uploading a file
 type UploadHandler struct {
 	logger    *slog.Logger
-	Filename  string
 	GcsClient gcs.GcsClient
 }
 
@@ -27,10 +26,9 @@ type FileUploadClient interface {
 }
 
 // NewUploadHandler creates a new upload handler
-func NewUploadHandler(logger *slog.Logger, filename string, gcsClient gcs.GcsClient) *UploadHandler {
+func NewUploadHandler(logger *slog.Logger, gcsClient gcs.GcsClient) *UploadHandler {
 	return &UploadHandler{
 		logger:    logger,
-		Filename:  filename,
 		GcsClient: gcsClient,
 	}
 }

@@ -12,16 +12,10 @@ import (
 
 var _ fileupload.SecurityHandler = (*SecurityHandler)(nil)
 
-var (
-	// htpasswd -nbBC 10 admin password
-	validCredentials = map[string]string{
-		"admin": "$2y$10$EW31SylAiDi7OD7drBbfkOZkSwD2YF7XvwLLS94IwAzejpnMF4eO6",
-	}
-)
-
 type SecurityHandler struct {
-	logger *slog.Logger
-	Auth   string
+	logger       *slog.Logger
+	AuthUsername string
+	AuthPassword string
 }
 
 // This allows us to mock the client for testing
@@ -30,10 +24,11 @@ type SecurityClient interface {
 }
 
 // NewUploadHandler creates a new security handler
-func NewSecurityHandler(logger *slog.Logger, auth string) *SecurityHandler {
+func NewSecurityHandler(logger *slog.Logger, username, password string) *SecurityHandler {
 	return &SecurityHandler{
-		logger: logger,
-		Auth:   auth,
+		logger:       logger,
+		AuthUsername: username,
+		AuthPassword: password,
 	}
 }
 
@@ -41,12 +36,12 @@ func NewSecurityHandler(logger *slog.Logger, auth string) *SecurityHandler {
 func (h *SecurityHandler) HandleBasicAuth(ctx context.Context, operationName fileupload.OperationName, auth fileupload.BasicAuth) (context.Context, error) {
 	startTime := time.Now()
 
-	hashed, exists := validCredentials[auth.Username]
-	if !exists {
-		return ctx, errors.New("error credentials invalid")
-	}
+	// hashed, exists := validCredentials[auth.Username]
+	// if !exists {
+	// 	return ctx, errors.New("error credentials invalid")
+	// }
 
-	if err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(auth.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(auth.Password), []byte(h.AuthPassword)); err != nil {
 		return ctx, errors.New("error credentials invalid")
 	}
 
@@ -56,5 +51,5 @@ func (h *SecurityHandler) HandleBasicAuth(ctx context.Context, operationName fil
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
-	return context.WithValue(ctx, "user", auth.Username), nil
+	return context.WithValue(ctx, "user", h.AuthUsername), nil
 }

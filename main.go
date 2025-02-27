@@ -11,15 +11,28 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/caarlos0/env"
+	"github.com/joho/godotenv"
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/pkg/errors"
 	"gitlab.com/totalprocessing/file-upload/internal/fileupload"
 	"gitlab.com/totalprocessing/file-upload/internal/gcs"
 	"gitlab.com/totalprocessing/file-upload/internal/handlers"
 	"gitlab.com/totalprocessing/file-upload/internal/logs"
+	"google.golang.org/api/option"
 )
 
-const filename string = "test-file"
+type Config struct {
+	Port            string        `env:"PORT" envDefault:"8080"`
+	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" envDefault:"5s"`
+
+	GcsProject    string `env:"GCS_PROJECT" envDefault:"up-pos-gateway-dev"`
+	GcsBucketName string `env:"GCS_BUCKET_NAME" envDefault:"dwh-file-upload-bucket"`
+	GcsLocation   string `env:"GCS_LOCATION" envDefault:"global"`
+
+	AuthUsername string `env:"AUTH_USERNAME" envDefault:"admin"`
+	AuthPassword string `env:"AUTH_PASSWORD" envDefault:"password"`
+}
 
 func main() {
 	logger := logs.NewPrettyLogger()
@@ -30,20 +43,37 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	err := godotenv.Load()
+	if err != nil {
+		logger.Info("No .env file loaded")
+	}
+
+	cfg := Config{}
+	if err := env.Parse(&cfg); err != nil {
+		return fmt.Errorf("parsing config: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var err error
-	gcsClient, err := storage.NewClient(ctx)
+	gcsClient, err := storage.NewClient(ctx,
+		option.WithQuotaProject(cfg.GcsProject))
 	if err != nil {
 		return fmt.Errorf("failed to create GCS client: %w", err)
 	}
 	defer gcsClient.Close()
 
-	sec := handlers.NewSecurityHandler(logger, "authentication")
-	h := handlers.NewUploadHandler(logger, filename, gcs.GcsClient{
+	sec := handlers.NewSecurityHandler(logger,
+		cfg.AuthPassword,
+		cfg.AuthPassword)
+
+	h := handlers.NewUploadHandler(logger, gcs.GcsClient{
 		Logger:    logger,
 		GcsClient: gcsClient,
+		GcsConfig: gcs.GcsConfig{
+			GcsProject:    cfg.GcsProject,
+			GcsLocation:   cfg.GcsLocation,
+			GcsBucketName: cfg.GcsBucketName},
 	})
 
 	fileUploadServer, err := fileupload.NewServer(h, sec,
@@ -56,19 +86,6 @@ func run(logger *slog.Logger) error {
 		logger.Error("failed to create server", "error", err)
 		return fmt.Errorf("failed to create server: %v", err)
 	}
-
-	// // Wrap with middleware to log errors
-	// wrappedServer := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 	recorder := &statusRecorder{w, 200}
-	// 	fileUploadServer.ServeHTTP(recorder, r)
-	// 	if recorder.status >= 400 {
-	// 		logger.Error("http error response",
-	// 			"status", recorder.status,
-	// 			"path", r.URL.Path,
-	// 			"method", r.Method,
-	// 		)
-	// 	}
-	// })
 
 	// ------- SERVER START
 	server := &http.Server{
@@ -107,13 +124,3 @@ func run(logger *slog.Logger) error {
 
 	return nil
 }
-
-// type statusRecorder struct {
-// 	http.ResponseWriter
-// 	status int
-// }
-
-// func (r *statusRecorder) WriteHeader(status int) {
-// 	r.status = status
-// 	r.ResponseWriter.WriteHeader(status)
-// }
