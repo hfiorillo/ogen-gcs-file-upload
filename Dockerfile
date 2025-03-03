@@ -1,5 +1,5 @@
 # argument for Go version
-ARG GO_VERSION=1.22
+ARG GO_VERSION=1.24
 
 # STAGE 1: building the executable
 FROM golang:${GO_VERSION}-alpine AS build
@@ -16,7 +16,7 @@ COPY ./ ./
 RUN CGO_ENABLED=0 go build \
     -ldflags "-X main.build=${BUILD_REF}" \
     -installsuffix 'static' \
-    -o /app ./app
+    -o /app .
 
 # Run the Go Binary in Distroless.
 FROM gcr.io/distroless/static@sha256:d6fa9db9548b5772860fecddb11d84f9ebd7e0321c0cb3c02870402680cc315f AS final

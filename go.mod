@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	cloud.google.com/go/storage v1.50.0
-	github.com/caarlos0/env v3.5.0+incompatible
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/dusted-go/logging v1.3.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.1.0

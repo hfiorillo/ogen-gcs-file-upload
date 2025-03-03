@@ -42,10 +42,14 @@ func (h *SecurityHandler) HandleBasicAuth(ctx context.Context, operationName fil
 	// }
 
 	if err := bcrypt.CompareHashAndPassword([]byte(auth.Password), []byte(h.AuthPassword)); err != nil {
+		h.logger.Warn("authentication unsuccessful",
+			"username", auth.Username,
+			"duration_ms", time.Since(startTime).Milliseconds(),
+		)
 		return ctx, errors.New("error credentials invalid")
 	}
 
-	h.logger.Info("authenticated succesfully",
+	h.logger.Info("authenticated successfully",
 		"operation", operationName,
 		"username", auth.Username,
 		"duration_ms", time.Since(startTime).Milliseconds(),

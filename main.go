@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/caarlos0/env"
+	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/pkg/errors"
@@ -26,12 +26,12 @@ type Config struct {
 	Port            string        `env:"PORT" envDefault:"8080"`
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" envDefault:"5s"`
 
-	GcsProject    string `env:"GCS_PROJECT" envDefault:"up-pos-gateway-dev"`
-	GcsBucketName string `env:"GCS_BUCKET_NAME" envDefault:"dwh-file-upload-bucket"`
+	GcsProject    string `env:"GCS_PROJECT,required,notEmpty"`
+	GcsBucketName string `env:"GCS_BUCKET_NAME,required,notEmpty"`
 	GcsLocation   string `env:"GCS_LOCATION" envDefault:"global"`
 
-	AuthUsername string `env:"AUTH_USERNAME" envDefault:"admin"`
-	AuthPassword string `env:"AUTH_PASSWORD" envDefault:"password"`
+	AuthUsername string `env:"AUTH_USERNAME,required,notEmpty"`
+	AuthPassword string `env:"AUTH_PASSWORD,required,notEmpty"`
 }
 
 func main() {
