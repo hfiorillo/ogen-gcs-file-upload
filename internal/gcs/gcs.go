@@ -6,11 +6,13 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/ogen-go/ogen/http"
+	ogenhttp "github.com/ogen-go/ogen/http"
 	"gitlab.com/totalprocessing/file-upload/internal/fileupload"
 )
 
@@ -29,6 +31,8 @@ type GcsConfig struct {
 var allowedTypes = map[string]bool{
 	"text/csv":        true,
 	"application/csv": true,
+	// https://learn.microsoft.com/en-us/previous-versions/office/office-2007-resource-kit/ee309278(v=office.12)?redirectedfrom=MSDN
+	"vnd.ms-excel": true,
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
 }
 
@@ -48,16 +52,11 @@ func NewGcsClient(ctx context.Context) (*storage.Client, error) {
 }
 
 // UploadToGcs handles file uploads to Google Cloud Storage
-func (g *GcsClient) UploadToGcs(
-	ctx context.Context,
-	filename string,
-	contentType string,
-	file http.MultipartFile,
-) (*fileupload.UploadResponse, error) {
+func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, contentType string, file ogenhttp.MultipartFile) (*fileupload.UploadResponse, error) {
 
 	// Validate and sanitize input
 	filename = sanitizeFilename(filename)
-	if err := validateFile(file, contentType); err != nil {
+	if err := validateFile(file); err != nil {
 		g.Logger.Error("file failed validation", "error", err)
 		return nil, err
 	}
@@ -85,10 +84,14 @@ func (g *GcsClient) UploadToGcs(
 }
 
 // validateFile checks file size and type
-func validateFile(file http.MultipartFile, contentType string) error {
-	contentType = strings.TrimPrefix(contentType, "type=")
+func validateFile(file ogenhttp.MultipartFile) error {
 	if file.Size > maxUploadSize {
 		return fmt.Errorf("file size exceeds 10MB limit: %d bytes", file.Size)
+	}
+
+	contentType, err := detectContentType(file)
+	if err != nil {
+		return fmt.Errorf("could not detect file type")
 	}
 
 	if !isAllowedType(contentType) {
@@ -100,11 +103,40 @@ func validateFile(file http.MultipartFile, contentType string) error {
 
 // isAllowedType checks if the content type is permitted
 func isAllowedType(contentType string) bool {
+	fmt.Println("Extracted Content-Type", "contentType", contentType)
 	baseType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		return false
 	}
-	return allowedTypes[baseType] // Lookup should work now
+	fmt.Println("baseType", baseType)
+	return allowedTypes[baseType]
+}
+
+// Infer MIME type from filename
+func inferMimeType(filename string, detectedType string) string {
+	ext := filepath.Ext(filename)
+	if ext == "" {
+		return detectedType
+	}
+
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType != "" {
+		return mimeType
+	}
+
+	return detectedType
+}
+
+// Better way of detecting mime type for xlsx
+func detectContentType(file ogenhttp.MultipartFile) (string, error) {
+	buf := make([]byte, 512)
+	_, err := file.File.Read(buf)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	detectedType := http.DetectContentType(buf)
+	contentType := inferMimeType(file.Name, detectedType)
+	return contentType, nil
 }
 
 // uploadWithRetry implements retry logic for GCS uploads
@@ -135,10 +167,7 @@ func uploadWithRetry(w io.Writer, file io.Reader) (int64, error) {
 
 // sanitizeFilename ensures safe filenames
 func sanitizeFilename(name string) string {
-	// Remove path traversal attempts
 	name = strings.ReplaceAll(name, "..", "")
-
-	// Remove special characters
 	name = strings.Map(func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z':
