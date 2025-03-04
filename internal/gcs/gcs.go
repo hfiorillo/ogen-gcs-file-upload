@@ -1,6 +1,7 @@
 package gcs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -32,7 +33,7 @@ var allowedTypes = map[string]bool{
 	"text/csv":        true,
 	"application/csv": true,
 	// https://learn.microsoft.com/en-us/previous-versions/office/office-2007-resource-kit/ee309278(v=office.12)?redirectedfrom=MSDN
-	"vnd.ms-excel": true,
+	"application/vnd.ms-excel": true,
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
 }
 
@@ -52,11 +53,11 @@ func NewGcsClient(ctx context.Context) (*storage.Client, error) {
 }
 
 // UploadToGcs handles file uploads to Google Cloud Storage
-func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, contentType string, file ogenhttp.MultipartFile) (*fileupload.UploadResponse, error) {
+func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, file ogenhttp.MultipartFile) (*fileupload.UploadResponse, error) {
 
 	// Validate and sanitize input
 	filename = sanitizeFilename(filename)
-	if err := validateFile(file); err != nil {
+	if err := g.validateFile(file); err != nil {
 		g.Logger.Error("file failed validation", "error", err)
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, contentTyp
 	defer w.Close()
 
 	// Set content type metadata
-	w.ObjectAttrs.ContentType = contentType
+	// w.ObjectAttrs.ContentType = contentType
 
 	// Upload file with retry logic
 	size, err := uploadWithRetry(w, file.File)
@@ -83,60 +84,106 @@ func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, contentTyp
 	}, nil
 }
 
-// validateFile checks file size and type
-func validateFile(file ogenhttp.MultipartFile) error {
-	if file.Size > maxUploadSize {
-		return fmt.Errorf("file size exceeds 10MB limit: %d bytes", file.Size)
-	}
+func (g *GcsClient) validateFile(file ogenhttp.MultipartFile) error {
+	g.Logger.Info("File details",
+		"filename", file.Name,
+		"file", fmt.Sprintf("%+v", file),
+		"file.Size", file.Size)
 
 	contentType, err := detectContentType(file)
 	if err != nil {
-		return fmt.Errorf("could not detect file type")
+		g.Logger.Error("content type detection failed",
+			"filename", file.Name,
+			"error", err)
+		return err
 	}
 
-	if !isAllowedType(contentType) {
-		return fmt.Errorf("invalid file type: %s. allowed types: %v", contentType, allowedTypes)
-	}
+	g.Logger.Info("file content type detected",
+		"filename", file.Name,
+		"contentType", contentType,
+		"allowedTypes", allowedTypes)
+
+	// if !isAllowedType(contentType) {
+	// 	return fmt.Errorf("invalid file type: %s. allowed types: %v", contentType, allowedTypes)
+	// }
 
 	return nil
 }
 
-// isAllowedType checks if the content type is permitted
-func isAllowedType(contentType string) bool {
-	fmt.Println("Extracted Content-Type", "contentType", contentType)
-	baseType, _, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return false
-	}
-	fmt.Println("baseType", baseType)
-	return allowedTypes[baseType]
-}
+// // isAllowedType checks if the content type is permitted
+// func isAllowedType(contentType string) bool {
+// 	fmt.Println("content type:", contentType)
+// 	baseType, _, err := mime.ParseMediaType(contentType)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	fmt.Println("baseType:", baseType)
+// 	return allowedTypes[baseType]
+// }
 
-// Infer MIME type from filename
-func inferMimeType(filename string, detectedType string) string {
-	ext := filepath.Ext(filename)
-	if ext == "" {
-		return detectedType
-	}
-
-	mimeType := mime.TypeByExtension(ext)
-	if mimeType != "" {
-		return mimeType
-	}
-
-	return detectedType
-}
-
-// Better way of detecting mime type for xlsx
+// Better way of detecting mime type for complex file types
 func detectContentType(file ogenhttp.MultipartFile) (string, error) {
-	buf := make([]byte, 512)
-	_, err := file.File.Read(buf)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
+	// Validate input
+	if file.File == nil {
+		return "", fmt.Errorf("nil file reader")
 	}
-	detectedType := http.DetectContentType(buf)
-	contentType := inferMimeType(file.Name, detectedType)
-	return contentType, nil
+
+	// Validate filename
+	if file.Name == "" {
+		return "", fmt.Errorf("empty filename")
+	}
+
+	ext := filepath.Ext(file.Name)
+	if ext != "" {
+		mimeType := mime.TypeByExtension(ext)
+		if mimeType != "" {
+			return mimeType, nil
+		}
+	}
+
+	// Limit read to prevent potential DoS via large file reads
+	lr := io.LimitReader(file.File, 512)
+	buf := make([]byte, 512)
+
+	n, err := lr.Read(buf)
+	if err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Detect content type from bytes
+	detectedType := http.DetectContentType(buf[:n])
+
+	// Special handling for CSV files
+	if strings.Contains(strings.ToLower(file.Name), ".csv") {
+		// Check for typical CSV content characteristics
+		csvContent := string(buf[:n])
+		if strings.Contains(csvContent, ",") || strings.Contains(csvContent, ";") {
+			return "text/csv", nil
+		}
+	}
+
+	// Special handling for problematic detections
+	switch detectedType {
+	case "text/plain":
+		if strings.Contains(strings.ToLower(file.Name), ".csv") {
+			return "text/csv", nil
+		}
+	case "application/zip":
+		// Strict signature checks for Excel files
+		if bytes.HasPrefix(buf, []byte{0x50, 0x4B, 0x03, 0x04}) {
+			if strings.Contains(strings.ToLower(file.Name), ".xlsx") {
+				detectedType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+			}
+		}
+	}
+
+	// Final type validation
+	if !allowedTypes[detectedType] {
+		return "", fmt.Errorf("unauthorized file type: %s", detectedType)
+	}
+
+	// If no specific type found, use the detected type
+	return detectedType, nil
 }
 
 // uploadWithRetry implements retry logic for GCS uploads

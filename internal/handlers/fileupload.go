@@ -39,7 +39,7 @@ func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFi
 
 	startTime := time.Now()
 
-	response, err := h.GcsClient.UploadToGcs(ctx, req.File.Name, req.File.Header.Get("Content-Type"), req.File)
+	response, err := h.GcsClient.UploadToGcs(ctx, req.File.Name, req.File)
 	if err != nil {
 		switch {
 		case strings.Contains(err.Error(), "invalid file type"),
@@ -58,7 +58,8 @@ func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFi
 	)
 
 	return &fileupload.UploadResponseHeaders{
-		Response: *response,
+		AccessControlAllowOrigin: fileupload.NewOptString("*"),
+		Response:                 *response,
 	}, nil
 }
 
