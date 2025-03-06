@@ -36,17 +36,20 @@ func NewUploadHandler(logger *slog.Logger, gcsClient gcs.GcsClient) *UploadHandl
 // UploadFile handles file upload requests
 // TODO: bug when multiple files are uploaded
 func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFileReq) (fileupload.UploadFileRes, error) {
-
 	startTime := time.Now()
-
 	response, err := h.GcsClient.UploadToGcs(ctx, req.File.Name, req.File)
 	if err != nil {
 		switch {
 		case strings.Contains(err.Error(), "invalid file type"),
 			strings.Contains(err.Error(), "file size exceeds"):
-			return &fileupload.UploadFileBadRequest{}, err
+			return &fileupload.UploadFileBadRequest{
+				Code:    400,
+				Message: err.Error(),
+			}, err
 		default:
-			return &fileupload.UploadFileInternalServerError{}, err
+			return &fileupload.UploadFileInternalServerError{
+				Code: 500,
+			}, err
 		}
 	}
 
@@ -63,7 +66,6 @@ func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFi
 	}, nil
 }
 
-// TODO: whats this for?
 func (h *UploadHandler) NewError(ctx context.Context, err error) *fileupload.ErrorStatusCodeWithHeaders {
 	return &fileupload.ErrorStatusCodeWithHeaders{}
 }
