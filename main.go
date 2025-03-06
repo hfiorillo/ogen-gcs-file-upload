@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,11 +15,11 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 	"github.com/ogen-go/ogen/ogenerrors"
-	"github.com/pkg/errors"
 	"gitlab.com/totalprocessing/file-upload/internal/fileupload"
 	"gitlab.com/totalprocessing/file-upload/internal/gcs"
 	"gitlab.com/totalprocessing/file-upload/internal/handlers"
 	"gitlab.com/totalprocessing/file-upload/internal/logs"
+	"gitlab.com/totalprocessing/file-upload/internal/tracing"
 	"google.golang.org/api/option"
 )
 
@@ -32,6 +33,8 @@ type Config struct {
 
 	AuthUsername string `env:"AUTH_USERNAME,required,notEmpty"`
 	AuthPassword string `env:"AUTH_PASSWORD,required,notEmpty"`
+
+	FileUploadLimit int `env:"FILE_UPLOAD_LIMIT" envDefault:"10"`
 }
 
 func main() {
@@ -56,6 +59,9 @@ func run(logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	defer stop()
+
 	gcsClient, err := storage.NewClient(ctx,
 		option.WithQuotaProject(cfg.GcsProject))
 	if err != nil {
@@ -76,12 +82,25 @@ func run(logger *slog.Logger) error {
 			GcsBucketName: cfg.GcsBucketName},
 	})
 
+	otelProviders, err := tracing.SetupOTelSDK(ctx, "http-file-upload", "v1")
+	if err != nil {
+		return err
+	}
+
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, otelProviders.Shutdown(context.Background()))
+	}()
+
 	fileUploadServer, err := fileupload.NewServer(h, sec,
 		fileupload.WithErrorHandler(func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 			logger.ErrorContext(ctx, "server error", "error", err)
 			ogenerrors.DefaultErrorHandler(ctx, w, r, err)
 		}),
+		fileupload.WithMeterProvider(otelProviders.MeterProvider),
+		fileupload.WithTracerProvider(otelProviders.TracerProvider),
 	)
+
 	if err != nil {
 		logger.Error("failed to create server", "error", err)
 		return fmt.Errorf("failed to create server: %v", err)
@@ -108,18 +127,23 @@ func run(logger *slog.Logger) error {
 	// ------- SHUTDOWN
 	select {
 	case err := <-serverErrors:
-		return errors.Wrap(err, "server error")
+		return fmt.Errorf("server error: %w", err)
 	case sig := <-shutdown:
 		logger.Info("shutdown", "status", "shutdown started", "signal", sig)
 		defer logger.Info("shutdown", "status", "shutdown complete", "signal", sig)
 
-		// ctx, cancel := context.WithTimeout(context.Background(), 2)
-		// defer cancel()
+		// prevent infefinite waiting
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
 
-		if err := server.Shutdown(ctx); err != nil {
+		if err := server.Shutdown(shutdownCtx); err != nil {
 			server.Close()
-			return errors.Wrap(err, "could not stop server gracefully")
+			return fmt.Errorf("could not stop server gracefully: %w", err)
 		}
+
+		// if err := otelProviders.Shutdown(ctx); err != nil {
+		// 	return errors.Wrap(err, "could not shutdown Open Telemetry")
+		// }
 	}
 
 	return nil
