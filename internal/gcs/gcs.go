@@ -35,6 +35,7 @@ var allowedTypes = map[string]bool{
 	// https://learn.microsoft.com/en-us/previous-versions/office/office-2007-resource-kit/ee309278(v=office.12)?redirectedfrom=MSDN
 	"application/vnd.ms-excel": true,
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+	"application/json": true,
 }
 
 type GcsClient struct {
@@ -78,6 +79,7 @@ func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, file ogenh
 
 	return &fileupload.UploadResponse{
 		Filename:   filename,
+		Bucket:     g.GcsConfig.GcsBucketName,
 		Gcspath:    fileupload.NewOptString(fmt.Sprintf("gs://%s/%s", g.GcsConfig.GcsBucketName, filename)),
 		FileSize:   size,
 		UploadTime: time.Now().UTC(),
@@ -101,24 +103,22 @@ func (g *GcsClient) validateFile(file ogenhttp.MultipartFile) error {
 	g.Logger.Info("file content type detected",
 		"filename", file.Name,
 		"contentType", contentType,
-		"allowedTypes", allowedTypes)
+	)
 
-	// if !isAllowedType(contentType) {
-	// 	return fmt.Errorf("invalid file type: %s. allowed types: %v", contentType, allowedTypes)
-	// }
+	if !allowedTypes[contentType] {
+		return fmt.Errorf("invalid file type: %s. allowed types: %v", contentType, allowedTypes)
+	}
 
 	return nil
 }
 
 // // isAllowedType checks if the content type is permitted
 // func isAllowedType(contentType string) bool {
-// 	fmt.Println("content type:", contentType)
-// 	baseType, _, err := mime.ParseMediaType(contentType)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	fmt.Println("baseType:", baseType)
-// 	return allowedTypes[baseType]
+// 	// baseType, _, err := mime.ParseMediaType(contentType)
+// 	// if err != nil {
+// 	// 	return false
+// 	// }
+// 	return allowedTypes[contentType]
 // }
 
 // Better way of detecting mime type for complex file types
