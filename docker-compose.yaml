@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  http-file-upload:
+    build:
+      context: .
+      target: ${GO_ENV}
+      dockerfile: local.Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 0
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=http-file-upload
+      - OTEL_LOG_LEVEL=debug
+      - OTEL_METRIC_EXPORT_INTERVAL=5000
+      # https://github.com/open-telemetry/opentelemetry-go/issues/4834
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4317
+
+      - GCS_PROJECT=tp-playground
+      - GCS_BUCKET_NAME=dwh-test-upload-file
+      - AUTH_USERNAME=admin
+      - AUTH_PASSWORD=password
+      - CLOUDSDK_CONFIG=/root/.config/gcloud
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud
+      - .:/app
+    ports:
+      - 8080:8080
+  lgtm:
+    image: docker.io/grafana/otel-lgtm:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_ALERTING_ENABLED=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_LOG_LEVEL=warn
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
+      - GF_PATHS_DATA=/data/grafana
+    ports:
+      - 3000:3000
+      - 4317:4317
+      - 4318:4318
+    volumes:
+      - ./container/grafana:/data/grafana
+      - ./container/prometheus:/data/prometheus
+      - ./container/loki:/data/loki
+      - grafana-dashboards.yaml:./grafana/conf/provisioning/dashboards/
+    depends_on:
+      - http-file-upload

@@ -87,7 +87,8 @@ func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, file ogenh
 }
 
 func (g *GcsClient) validateFile(file ogenhttp.MultipartFile) error {
-	g.Logger.Info("File details",
+	g.Logger.Info(
+		"File details",
 		"filename", file.Name,
 		"file", fmt.Sprintf("%+v", file),
 		"file.Size", file.Size)
@@ -111,15 +112,6 @@ func (g *GcsClient) validateFile(file ogenhttp.MultipartFile) error {
 
 	return nil
 }
-
-// // isAllowedType checks if the content type is permitted
-// func isAllowedType(contentType string) bool {
-// 	// baseType, _, err := mime.ParseMediaType(contentType)
-// 	// if err != nil {
-// 	// 	return false
-// 	// }
-// 	return allowedTypes[contentType]
-// }
 
 // Better way of detecting mime type for complex file types
 func detectContentType(file ogenhttp.MultipartFile) (string, error) {
