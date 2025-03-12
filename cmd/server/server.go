@@ -20,6 +20,7 @@ import (
 	"gitlab.com/totalprocessing/file-upload/internal/handlers"
 	"gitlab.com/totalprocessing/file-upload/internal/logs"
 	"gitlab.com/totalprocessing/file-upload/internal/tracing"
+
 	"google.golang.org/api/option"
 )
 
@@ -59,11 +60,16 @@ func run(logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
-	defer stop()
+	// ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	// defer stop()
+
+	// create new tracing client
+	client := tracing.NewTracingClient()
 
 	gcsClient, err := storage.NewClient(ctx,
-		option.WithQuotaProject(cfg.GcsProject))
+		option.WithQuotaProject(cfg.GcsProject),
+		option.WithHTTPClient(client),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create GCS client: %w", err)
 	}
@@ -87,12 +93,13 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	// Handle shutdown properly so nothing leaks.
+	// handle shutdown properly so nothing leaks
 	defer func() {
 		err = errors.Join(err, otelProviders.Shutdown(context.Background()))
 	}()
 
 	fileUploadServer, err := fileupload.NewServer(h, sec,
+		fileupload.WithMiddleware(),
 		fileupload.WithErrorHandler(func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 			logger.ErrorContext(ctx, "server error", "error", err)
 			ogenerrors.DefaultErrorHandler(ctx, w, r, err)

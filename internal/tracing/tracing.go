@@ -51,7 +51,9 @@ func createTraceProvider(ctx context.Context, res *resource.Resource) (*trace.Tr
 		trace.WithResource(res),
 		trace.WithBatcher(
 			traceExporter,
-			trace.WithBatchTimeout(time.Second),
+			trace.WithBatchTimeout(5*time.Second),
+			trace.WithMaxExportBatchSize(500),
+			trace.WithMaxQueueSize(1000),
 		),
 	)
 
@@ -85,10 +87,15 @@ func createLoggerProvider(res *resource.Resource) (*log.LoggerProvider, error) {
 		return nil, fmt.Errorf("failed to create log exporter: %w", err)
 	}
 
-	// Create logger provider
 	loggerProvider := log.NewLoggerProvider(
 		log.WithResource(res),
-		log.WithProcessor(log.NewBatchProcessor(logExporter)),
+		log.WithProcessor(
+			log.NewBatchProcessor(
+				logExporter,
+				log.WithMaxQueueSize(1000),
+				log.WithExportTimeout(30*time.Second),
+			),
+		),
 	)
 
 	return loggerProvider, nil
