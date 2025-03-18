@@ -8,14 +8,16 @@ import (
 )
 
 // Middleware is a net/http middleware.
-type Middleware = func(http.Handler) http.Handler
+// type Middleware = func(http.Handler) http.Handler
 
 // tracingTransport injects OpenTelemetry headers into requests
 type TracingTransport struct {
 	Wrapped http.RoundTripper
 }
 
-// Inject tracing headers
+// Inject tracing headers using RoundTrip - like middleware but for a http.Client
+// Round tripping occurs before the request is actually sent
+// https://lanre.wtf/blog/2017/07/24/roundtripper-go
 func (t *TracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	propagator := otel.GetTextMapPropagator()
 	propagator.Inject(req.Context(), propagation.HeaderCarrier(req.Header))
