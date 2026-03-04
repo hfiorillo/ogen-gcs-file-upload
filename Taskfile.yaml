@@ -13,10 +13,10 @@ tasks:
     desc: Generate and re-build on changes
     cmds:
       - air
-  hurl:
-    desc: Hurl a test
+  httpyac:
+    desc: Run HTTP API tests with httpyac (requires httpyac CLI)
     cmds:
-      - hurl --test ./hurl/test.hurl
+      - httpyac send ./http-tests/upload.http --all
   generate:
     desc: Generate API client from OpenAPI spec
     cmds:
