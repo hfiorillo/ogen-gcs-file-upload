@@ -13,10 +13,30 @@ tasks:
     desc: Generate and re-build on changes
     cmds:
       - air
-  httpyac:
-    desc: Run HTTP API tests with httpyac (requires httpyac CLI)
+  httpyac-csv:
+    desc: Run CSV upload API tests with httpyac
     cmds:
-      - httpyac send ./http-tests/upload.http --all
+      - httpyac send ./http-tests/upload_csv.http --all
+  httpyac-xlsx:
+    desc: Run XLSX upload API tests with httpyac
+    cmds:
+      - httpyac send ./http-tests/upload_xlsx.http --all
+  httpyac-json:
+    desc: Run JSON rejection API tests with httpyac
+    cmds:
+      - httpyac send ./http-tests/upload_json.http --all
+  httpyac-zip:
+    desc: Run ZIP rejection API tests with httpyac
+    cmds:
+      - httpyac send ./http-tests/upload_zip.http --all
+  httpyac-all:
+    desc: Run all HTTP API tests with httpyac
+    cmds:
+      - httpyac send ./http-tests/*.http --all
+  httpyac:
+    desc: Alias for running all HTTP API tests with httpyac
+    cmds:
+      - task httpyac-all
   generate:
     desc: Generate API client from OpenAPI spec
     cmds:

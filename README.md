@@ -7,7 +7,8 @@ Use `.env.example` as a baseline. Basic auth supports either:
 To generate a bcrypt hash:
 `htpasswd -nbBC 10 admin password`
 
-`./http-tests/upload.http` uses plain credentials (`admin:password`) for local development.
+`./http-tests/upload_csv.http` and `./http-tests/upload_xlsx.http` use plain credentials (`admin:password`) for local development.
+Negative type checks are in `./http-tests/upload_json.http` and `./http-tests/upload_zip.http` (both expected `400`).
 
 - Currently limited to:
   - 10Mb upload
@@ -45,4 +46,15 @@ Install `httpyac`:
 
 Run `task httpyac`
 
-Edit `./http-tests/upload.http` to change the requests being sent
+Run individual files:
+
+- `task httpyac-csv`
+- `task httpyac-xlsx`
+- `task httpyac-json`
+- `task httpyac-zip`
+
+Run all files:
+
+- `task httpyac-all`
+
+Edit files in `./http-tests/*.http` to change requests/assertions.

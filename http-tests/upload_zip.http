@@ -1,0 +1,26 @@
+@baseUrl = http://localhost:8080
+# Base64("admin:password")
+@authOk = Basic YWRtaW46cGFzc3dvcmQ=
+
+### Upload ZIP (expected 400 bad request)
+# @name upload_zip_rejected
+POST {{baseUrl}}/upload
+Authorization: {{authOk}}
+Content-Type: multipart/form-data; boundary=tp-boundary
+
+--tp-boundary
+Content-Disposition: form-data; name="file"; filename="example.zip"
+Content-Type: application/zip
+
+< ./fixtures/example.zip
+--tp-boundary--
+
+> {%
+client.test("zip upload returns 400", () => {
+  client.assert(response.status === 400, `Expected 400 but got ${response.status}`);
+});
+
+client.test("zip upload error payload is shaped", () => {
+  client.assert(response.parsedBody.code === 400, "expected error code 400");
+});
+%}

@@ -1,5 +1,7 @@
 @baseUrl = http://localhost:8080
+# Base64("admin:password")
 @authOk = Basic YWRtaW46cGFzc3dvcmQ=
+# Base64("admin:bad-password")
 @authBad = Basic YWRtaW46YmFkLXBhc3N3b3Jk
 
 ### Upload CSV (expected 200)
