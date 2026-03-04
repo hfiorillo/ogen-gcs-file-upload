@@ -1,0 +1,48 @@
+@baseUrl = http://localhost:8080
+# Base64("admin:password")
+@authOk = Basic YWRtaW46cGFzc3dvcmQ=
+# Base64("admin:bad-password")
+@authBad = Basic YWRtaW46YmFkLXBhc3N3b3Jk
+
+### Upload XLSX (expected 200)
+# @name upload_xlsx_ok
+POST {{baseUrl}}/upload
+Authorization: {{authOk}}
+Content-Type: multipart/form-data; boundary=tp-boundary
+
+--tp-boundary
+Content-Disposition: form-data; name="file"; filename="sample_data.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./fixtures/sample_data.xlsx
+--tp-boundary--
+
+> {%
+client.test("xlsx upload returns 200", () => {
+  client.assert(response.status === 200, `Expected 200 but got ${response.status}`);
+});
+
+client.test("xlsx upload response has bucket + filename", () => {
+  client.assert(!!response.parsedBody.bucket, "bucket is missing");
+  client.assert(response.parsedBody.filename === "sample_data.xlsx", "unexpected filename");
+});
+%}
+
+### Upload XLSX with bad credentials (expected 401)
+# @name upload_xlsx_unauthorized
+POST {{baseUrl}}/upload
+Authorization: {{authBad}}
+Content-Type: multipart/form-data; boundary=tp-boundary
+
+--tp-boundary
+Content-Disposition: form-data; name="file"; filename="sample_data.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./fixtures/sample_data.xlsx
+--tp-boundary--
+
+> {%
+client.test("invalid auth on xlsx returns 401", () => {
+  client.assert(response.status === 401, `Expected 401 but got ${response.status}`);
+});
+%}

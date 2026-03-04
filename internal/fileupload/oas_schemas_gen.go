@@ -197,7 +197,7 @@ type UploadResponse struct {
 	// GCS bucket where the file was stored.
 	Bucket string `json:"bucket"`
 	// GCS Path.
-	Gcspath OptString `json:"gcspath"`
+	Gcspath string `json:"gcspath"`
 	// Timestamp when the file was uploaded.
 	UploadTime time.Time `json:"uploadTime"`
 }
@@ -218,7 +218,7 @@ func (s *UploadResponse) GetBucket() string {
 }
 
 // GetGcspath returns the value of Gcspath.
-func (s *UploadResponse) GetGcspath() OptString {
+func (s *UploadResponse) GetGcspath() string {
 	return s.Gcspath
 }
 
@@ -243,7 +243,7 @@ func (s *UploadResponse) SetBucket(val string) {
 }
 
 // SetGcspath sets the value of Gcspath.
-func (s *UploadResponse) SetGcspath(val OptString) {
+func (s *UploadResponse) SetGcspath(val string) {
 	s.Gcspath = val
 }
 
