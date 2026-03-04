@@ -76,16 +76,21 @@ func run(logger *slog.Logger) error {
 	defer gcsClient.Close()
 
 	sec := handlers.NewSecurityHandler(logger,
+		cfg.AuthUsername,
 		cfg.AuthPassword,
-		cfg.AuthPassword)
+	)
+
+	maxUploadSizeBytes := int64(cfg.FileUploadLimit) * 1024 * 1024
 
 	h := handlers.NewUploadHandler(logger, gcs.GcsClient{
 		Logger:    logger,
 		GcsClient: gcsClient,
 		GcsConfig: gcs.GcsConfig{
-			GcsProject:    cfg.GcsProject,
-			GcsLocation:   cfg.GcsLocation,
-			GcsBucketName: cfg.GcsBucketName},
+			GcsProject:         cfg.GcsProject,
+			GcsLocation:        cfg.GcsLocation,
+			GcsBucketName:      cfg.GcsBucketName,
+			MaxUploadSizeBytes: maxUploadSizeBytes,
+		},
 	})
 
 	otelProviders, err := tracing.SetupOTelSDK(ctx, "http-file-upload", "v1")
