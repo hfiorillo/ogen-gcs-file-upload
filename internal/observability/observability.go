@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"go.opentelemetry.io/otel"
@@ -21,6 +22,7 @@ type Config struct {
 	ServiceVersion string
 	Environment    string
 
+	Logger            *slog.Logger
 	TracingEnabled    bool
 	TracingEndpoint   string
 	TracingSampleRate float64
@@ -92,6 +94,13 @@ func createTracerProvider(cfg Config, res *resource.Resource) (*trace.TracerProv
 
 	exporter, err := otlptracegrpc.New(context.Background(), opts...)
 	if err != nil {
+		if cfg.Logger != nil {
+			cfg.Logger.Warn(
+				"tracing exporter initialization failed; falling back to noop tracer",
+				"endpoint", endpoint,
+				"error", err,
+			)
+		}
 		return newNoopTracerProvider(res), nil
 	}
 

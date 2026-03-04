@@ -42,7 +42,10 @@ func NewSecurityHandler(logger *slog.Logger, username, password string) *Securit
 func (h *SecurityHandler) HandleBasicAuth(ctx context.Context, operationName fileupload.OperationName, auth fileupload.BasicAuth) (context.Context, error) {
 	startTime := time.Now()
 
-	if !constantTimeEqual(auth.Username, h.AuthUsername) || !h.passwordMatches(auth.Password) {
+	// Evaluate both checks to avoid username-dependent short-circuit timing.
+	usernameMatches := constantTimeEqual(auth.Username, h.AuthUsername)
+	passwordMatches := h.passwordMatches(auth.Password)
+	if !(usernameMatches && passwordMatches) {
 		h.logger.Warn("authentication unsuccessful",
 			"username", auth.Username,
 			"duration_ms", time.Since(startTime).Milliseconds(),

@@ -104,6 +104,7 @@ func run(cfg Config, logger *slog.Logger) (err error) {
 		ServiceName:       "http-file-upload",
 		ServiceVersion:    "v1",
 		Environment:       cfg.Environment,
+		Logger:            logger,
 		TracingEnabled:    cfg.TracingEnabled,
 		TracingEndpoint:   cfg.TracingEndpoint,
 		TracingSampleRate: cfg.TracingSampleRate,
