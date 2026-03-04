@@ -7,7 +7,7 @@ Use `.env.example` as a baseline. Basic auth supports either:
 To generate a bcrypt hash:
 `htpasswd -nbBC 10 admin password`
 
-`./hurl/test.hurl` uses plain credentials (`admin:password`) for local development.
+`./http-tests/upload.http` uses plain credentials (`admin:password`) for local development.
 
 - Currently limited to:
   - 10Mb upload
@@ -39,6 +39,10 @@ Run `task generate`
 
 # To test
 
-Run `task hurl`
+Install `httpyac`:
 
-Edit the `./hurl/test.hurl` file to change the requests being sent
+`npm install -g httpyac`
+
+Run `task httpyac`
+
+Edit `./http-tests/upload.http` to change the requests being sent
