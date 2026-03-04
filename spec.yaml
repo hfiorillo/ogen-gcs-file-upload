@@ -131,7 +131,7 @@ components:
         - filename
         - fileSize
         - bucket
-        - gcs
+        - gcspath
         - uploadTime
     Error:
       type: object
