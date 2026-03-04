@@ -44,24 +44,22 @@ type Config struct {
 }
 
 func main() {
-	logger := logs.NewPrettyLogger()
-	if err := run(logger); err != nil {
+	_ = godotenv.Load()
+
+	cfg := Config{}
+	if err := env.Parse(&cfg); err != nil {
+		logs.NewLogger("local").Error("server", "error", fmt.Errorf("parsing config: %w", err))
+		os.Exit(1)
+	}
+
+	logger := logs.NewLogger(cfg.Environment)
+	if err := run(cfg, logger); err != nil {
 		logger.Error("server", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) (err error) {
-	err = godotenv.Load()
-	if err != nil {
-		logger.Info("No .env file loaded")
-	}
-
-	cfg := Config{}
-	if err := env.Parse(&cfg); err != nil {
-		return fmt.Errorf("parsing config: %w", err)
-	}
-
+func run(cfg Config, logger *slog.Logger) (err error) {
 	logger.Info(
 		"configuration loaded",
 		"port", cfg.Port,

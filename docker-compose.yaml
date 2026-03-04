@@ -16,7 +16,7 @@ services:
       - OTEL_EXPORTER_OTLP_INSECURE=true
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4317
-      - ENVIRONMENT=development
+      - ENVIRONMENT=local
       - TRACING_ENABLED=true
       - TRACING_ENDPOINT=lgtm:4317
       - TRACING_SAMPLE_RATE=1.0
