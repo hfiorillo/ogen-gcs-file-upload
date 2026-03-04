@@ -97,7 +97,7 @@ func (g *GcsClient) UploadToGcs(ctx context.Context, filename string, file ogenh
 	return &fileupload.UploadResponse{
 		Filename:   filename,
 		Bucket:     g.GcsConfig.GcsBucketName,
-		Gcspath:    fileupload.NewOptString(fmt.Sprintf("gs://%s/%s", g.GcsConfig.GcsBucketName, filename)),
+		Gcspath:    fmt.Sprintf("gs://%s/%s", g.GcsConfig.GcsBucketName, filename),
 		FileSize:   size,
 		UploadTime: time.Now().UTC(),
 	}, nil

@@ -63,7 +63,7 @@ func (h *UploadHandler) UploadFile(ctx context.Context, req *fileupload.UploadFi
 	h.logger.Info("file uploaded successfully",
 		"filename", response.Filename,
 		"size", response.FileSize,
-		"gcsPath", response.Gcspath.Value,
+		"gcsPath", response.Gcspath,
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 

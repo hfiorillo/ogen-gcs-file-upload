@@ -51,8 +51,8 @@ func main() {
 	}
 }
 
-func run(logger *slog.Logger) error {
-	err := godotenv.Load()
+func run(logger *slog.Logger) (err error) {
+	err = godotenv.Load()
 	if err != nil {
 		logger.Info("No .env file loaded")
 	}
@@ -165,11 +165,11 @@ func run(logger *slog.Logger) error {
 
 	// ------- SHUTDOWN
 	select {
-	case err := <-serverErrors:
-		if errors.Is(err, http.ErrServerClosed) {
+	case serverErr := <-serverErrors:
+		if errors.Is(serverErr, http.ErrServerClosed) {
 			return nil
 		}
-		return fmt.Errorf("server error: %w", err)
+		return fmt.Errorf("server error: %w", serverErr)
 	case sig := <-shutdown:
 		receivedShutdownSignal = true
 		logger.Info("shutdown", "status", "shutdown started", "signal", sig)
