@@ -16,6 +16,9 @@ services:
       - OTEL_EXPORTER_OTLP_INSECURE=true
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4317
+      - TRACING_ENABLED=true
+      - TRACING_ENDPOINT=lgtm:4317
+      - TRACING_INSECURE=true
 
       - GCS_PROJECT=tp-playground
       - GCS_BUCKET_NAME=dwh-test-upload-file

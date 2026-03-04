@@ -30,7 +30,9 @@ tasks:
     desc: Build the project
     deps: [generate]
     cmds:
-      - go build ./...
+      - mkdir -p ./.build
+      - go build -o ./.build/server ./cmd/server
+      - go build -o ./.build/client ./cmd/client
   test:
     desc: Run tests
     deps: [generate]

@@ -39,7 +39,7 @@ COPY . .
 
 # Build the application
 # Turn off CGO to ensure static binaries
-RUN CGO_ENABLED=0 go build -o go-blog
+RUN CGO_ENABLED=0 go build -o file-upload-http ./cmd/server
 
 # Production stage
 # =============================================================================
@@ -50,10 +50,10 @@ FROM scratch AS production
 WORKDIR /prod
 
 # Copy binary from builder stage
-COPY --from=builder /build/go-blog ./
+COPY --from=builder /build/file-upload-http ./
 
 # Document the port that may need to be published
-EXPOSE 8000
+EXPOSE 8080
 
 # Start the application
-CMD ["/prod/go-blog"]
+CMD ["/prod/file-upload-http"]
